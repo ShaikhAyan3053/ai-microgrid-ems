@@ -1,0 +1,47 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+env/
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Data (large files)
+data/raw/*.csv
+data/raw/*.json
+data/processed/*.csv
+data/processed/*.pkl
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# Results
+results/figures/*.png
+results/figures/*.pdf
+results/tables/*.csv
+!results/figures/.gitkeep
+!results/tables/.gitkeep
+
+# Model artifacts
+*.h5
+*.keras
+*.pkl
+*.joblib
+saved_models/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
