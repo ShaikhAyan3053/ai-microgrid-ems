@@ -26,11 +26,7 @@ data/processed/*.pkl
 !data/processed/.gitkeep
 
 # Results
-results/figures/*.png
 results/figures/*.pdf
-results/tables/*.csv
-!results/figures/.gitkeep
-!results/tables/.gitkeep
 
 # Model artifacts
 *.h5

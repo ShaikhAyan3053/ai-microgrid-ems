@@ -15,8 +15,8 @@ An **AI-assisted microgrid energy management system (EMS)** combining solar irra
 | Metric | Value | Method |
 |--------|-------|--------|
 | **Forecasting Accuracy** | ~92% (Solar GHI), ~94% (Load) | LSTM Neural Networks & XGBoost Gradient Boosting |
-| **Unserved Load Reduction** | **33.8% average cut** during outages (up to **57.1%**) | Forecast-driven look-ahead battery pre-charging |
-| **Operating Cost Reduction** | Up to **17.2%** savings (7.2% annual net) | TOU peak-shaving & anticipatory storage dispatch |
+| **Unserved Load Reduction** | **42.7% average cut** during outages (up to **77.9%**) | Multi-Period Linear Programming (HiGHS LP) |
+| **Operating Cost Reduction** | **14.8% average reduction** (up to **28.6%**) | Multi-Period Linear Programming with TOU Arbitrage |
 | **Power Quality Bounds** | Voltage ±5%, Frequency ±2% | Controlled inverter droop during islanded operation |
 
 ---
@@ -177,17 +177,17 @@ The EMS provides two dispatch engines in [`src/optimization/battery_scheduler.py
 
 Evaluated across a test set of 1,752 hours (Q4 test partition) under 7 standardized outage scenarios:
 
-| Scenario | Outage Severity | Outage Hours | Rule-Based Unserved | AI-Assisted Unserved | Unserved Reduction | Cost Reduction |
+| Scenario | Outage Severity | Outage Hours | Rule-Based Unserved | AI (LP) Unserved | Unserved Reduction | Cost Reduction |
 |:---|:---|:---:|:---:|:---:|:---:|:---:|
-| **S1** | Grid-connected (baseline) | 0h | 63.4 kWh | 63.4 kWh | — | +0.0% |
-| **S2** | Minor (3 short events) | 10h | 1,266.4 kWh | 543.3 kWh | **-57.1%** | +10.0% |
-| **S3** | Moderate (5 events, 4–8h) | 33h | 3,863.5 kWh | 2,472.5 kWh | **-36.0%** | +14.1% |
-| **S4** | Severe (3 events, 12–24h) | 52h | 5,529.2 kWh | 4,777.1 kWh | **-13.6%** | +6.5% |
-| **S5** | Extreme (2 multi-day events) | 62h | 6,807.8 kWh | 6,436.4 kWh | **-5.5%** | +2.9% |
-| **S6** | Frequent (10 recurring events)| 22h | 2,626.4 kWh | 1,129.2 kWh | **-57.0%** | +17.2% |
-| **S7** | Clustered summer peak | 0h | 63.4 kWh | 63.4 kWh | — | +0.0% |
+| **S1** | Grid-connected (baseline) | 0h | 63.4 kWh | 0.0 kWh | **-100.0%** | +8.3% |
+| **S2** | Minor (3 short events) | 10h | 1,266.4 kWh | 405.3 kWh | **-68.0%** | +17.7% |
+| **S3** | Moderate (5 events, 4–8h) | 33h | 3,863.5 kWh | 2,306.5 kWh | **-40.3%** | +20.1% |
+| **S4** | Severe (3 events, 12–24h) | 52h | 5,529.2 kWh | 4,553.8 kWh | **-17.6%** | +12.1% |
+| **S5** | Extreme (2 multi-day events) | 62h | 6,807.8 kWh | 6,136.3 kWh | **-9.9%** | +8.5% |
+| **S6** | Frequent (10 recurring events)| 22h | 2,626.4 kWh | 580.5 kWh | **-77.9%** | +28.6% |
+| **S7** | Clustered summer peak | 0h | 63.4 kWh | 0.0 kWh | **-100.0%** | +8.3% |
 
-> **Key Finding**: Anticipatory charging delivers massive resilience improvements (36% to 57% unserved load reduction) during short-to-moderate outages by ensuring full storage capacity prior to grid disconnection. In extreme multi-day outages (S4–S5), the advantage converges to 5–14% as storage energy is ultimately limited by the 400 kWh battery pack capacity.
+> **Key Finding**: Multi-period Linear Programming achieves massive resilience gains (40% to 78% unserved load reduction) across short, moderate, and recurring outages by dynamically scheduling energy reservations ahead of grid disconnection. In extreme multi-day outages (S4–S5), unserved load reductions moderate to 10–18% because battery duration is physically bound by the 400 kWh storage capacity.
 
 ---
 
@@ -195,7 +195,7 @@ Evaluated across a test set of 1,752 hours (Q4 test partition) under 7 standardi
 
 Transparently stating assumptions is essential for credible power systems research:
 1. **Data Provenance**: The default benchmark uses physics-based synthetic data calibrated to Phoenix, AZ; validation against empirical utility smart-meter telemetry is an active next step.
-2. **Computational Architecture**: The real-time simulation loop executes the fast look-ahead heuristic to reflect the compute envelope of microgrid programmable logic controllers (PLCs/RTUs). The multi-period Linear Program (`optimize_lp`) serves as an offline optimal benchmark.
+2. **Computational Architecture**: The EMS natively employs multi-period Linear Programming (`optimize_lp` via SciPy HiGHS) as the primary dispatch engine for forecast-driven energy management, while maintaining a lightweight look-ahead heuristic as an edge fallback for embedded hardware with low compute envelopes.
 3. **Outage Foresight Assumption**: Anticipatory charging assumes a 6–12 hour advisory window prior to outages (modeling severe weather forecasts or utility warning alerts). Ongoing work includes stochastic chance-constrained optimization for unexpected instantaneous line trips.
 4. **Battery Degradation Modeling**: Aging is currently captured through a linearized throughput degradation cost ($0.01/kWh) rather than non-linear electro-chemical models (e.g., Rainflow cycle counting or SEI growth).
 

@@ -1,0 +1,8 @@
+scenario,outage_hours,cost_reduction_pct,unserved_reduction_pct,rule_cost,ai_cost,rule_unserved,ai_unserved
+S1_no_outage,0,8.3,100.0,29328.93,26889.7,63.4,0.0
+S2_minor,10,17.7,68.0,35122.42,28888.22,1266.4,405.3
+S3_moderate,33,20.1,40.3,47672.8,38110.15,3863.5,2306.5
+S4_severe,52,12.1,17.6,55877.39,49117.45,5529.2,4553.8
+S5_extreme,62,8.5,9.9,62073.34,56774.68,6807.8,6136.3
+S6_frequent,22,28.6,77.9,41727.1,29776.74,2626.4,580.5
+S7_clustered,0,8.3,100.0,29328.93,26889.7,63.4,0.0

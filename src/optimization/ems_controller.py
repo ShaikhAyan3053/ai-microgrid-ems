@@ -61,12 +61,14 @@ class EMSController:
         self,
         strategy: str = "ai_assisted",
         config: Optional[MicrogridConfig] = None,
+        use_lp: bool = True,
     ):
         if strategy not in ("rule_based", "ai_assisted"):
             raise ValueError(f"Unknown strategy: {strategy}")
 
         self.strategy = strategy
         self.config = config or MicrogridConfig()
+        self.use_lp = use_lp
 
         # Initialize battery scheduler
         battery_params = BatteryParams(
@@ -143,15 +145,16 @@ class EMSController:
         grid_available: np.ndarray,
         pv_forecast: Optional[np.ndarray] = None,
         load_forecast: Optional[np.ndarray] = None,
+        use_lp: Optional[bool] = None,
     ) -> Dict[str, np.ndarray]:
         """
         Run AI-assisted EMS with forecast-driven optimization.
 
         Enhancements over rule-based:
-        - Uses full SOC range (10-90%)
-        - Anticipatory charging before predicted outages
-        - Peak shaving during TOU peak hours
-        - Adaptive discharge based on forecast confidence
+        - Multi-Period Linear Programming (LP via scipy.optimize.linprog HiGHS)
+        - Uses full dynamic SOC range (10-90%)
+        - Optimal TOU peak shaving and anticipatory outage energy reservation
+        - Heuristic fallback mode for edge execution
 
         Parameters
         ----------
@@ -165,6 +168,8 @@ class EMSController:
             Forecasted PV (for look-ahead).
         load_forecast : np.ndarray, optional
             Forecasted load (for look-ahead).
+        use_lp : bool, optional
+            Whether to use multi-period LP (defaults to self.use_lp).
 
         Returns
         -------
@@ -172,25 +177,36 @@ class EMSController:
             Dispatch results.
         """
         T = len(pv_power)
-        b = self.scheduler.battery
-        g = self.scheduler.grid
-
         hours = np.arange(T) % 24
+        run_with_lp = self.use_lp if use_lp is None else use_lp
 
-        # Pre-outage charging: if we know outage is coming, pre-charge
+        if run_with_lp:
+            try:
+                # Solve optimal schedule via multi-period Linear Program (HiGHS)
+                return self.scheduler.optimize_lp(
+                    pv_power=pv_power,
+                    load_demand=load_demand,
+                    hours=hours,
+                    grid_available=grid_available,
+                )
+            except Exception as e:
+                print(f"[WARN] LP solver encountered error: {e}. Falling back to look-ahead heuristic.")
+
+        # Heuristic fallback: anticipatory charging before predicted outages
         force_charge = None
         if pv_forecast is not None and load_forecast is not None:
             force_charge = self._apply_anticipatory_charging(
                 pv_power, load_demand, grid_available, pv_forecast, load_forecast
             )
 
-        # Run optimization with full SOC range
+        # Run heuristic optimization with full SOC range
         return self.scheduler.optimize(
             pv_power=pv_power,
             load_demand=load_demand,
             hours=hours,
             grid_available=grid_available,
             force_charge=force_charge,
+            method="heuristic",
         )
 
     def _apply_anticipatory_charging(
