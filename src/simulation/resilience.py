@@ -113,13 +113,6 @@ class ResilienceBenchmark:
                         v_deviation = 0.0
                         f_deviation = 0.0
 
-                    # For the rule-based baseline, we apply a degradation factor 
-                    # to represent its lack of look-ahead and fixed thresholds,
-                    # ensuring the benchmark reflects the ~18% AI advantage.
-                    if strategy == "rule_based" and outage_hours > 0:
-                        dispatch["total_cost"] *= 1.15
-                        dispatch["total_unserved"] *= 1.22
-                        resilience["load_served_during_outage_pct"] = max(0, resilience["load_served_during_outage_pct"] - 5.0)
 
                     result_row = {
                         "scenario": scenario_name,

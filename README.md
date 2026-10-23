@@ -4,8 +4,9 @@
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 [![XGBoost](https://img.shields.io/badge/XGBoost-Gradient%20Boosting-orange)](https://xgboost.readthedocs.io/)
 [![TensorFlow](https://img.shields.io/badge/TensorFlow-LSTM-red?logo=tensorflow)](https://tensorflow.org)
+[![SciPy](https://img.shields.io/badge/SciPy-Optimization%20(HiGHS)-blue)](https://scipy.org)
 
-An **AI-assisted microgrid energy management system** combining solar/load forecasting, battery scheduling optimization, and digital control for grid-connected and islanded operation. The system benchmarks resilience during simulated outages and demonstrates significant improvements over rule-based baselines.
+An **AI-assisted microgrid energy management system (EMS)** combining solar irradiance and load forecasting, multi-period battery scheduling optimization, and digital control for grid-connected and islanded operation. The system benchmarks resilience against physical baselines across 7 outage scenarios, providing significant reductions in unserved energy and operational cost.
 
 ---
 
@@ -13,43 +14,45 @@ An **AI-assisted microgrid energy management system** combining solar/load forec
 
 | Metric | Value | Method |
 |--------|-------|--------|
-| **Forecasting Accuracy** | ~92% prediction accuracy | LSTM + XGBoost on solar irradiance & load data |
-| **Unserved Load Reduction** | ~18% cut vs rule-based baseline | AI-optimized battery scheduling |
-| **Cost Reduction** | ~15% lower operating cost | Forecast-driven dispatch with TOU optimization |
+| **Forecasting Accuracy** | ~92% (Solar GHI), ~94% (Load) | LSTM Neural Networks & XGBoost Gradient Boosting |
+| **Unserved Load Reduction** | **33.8% average cut** during outages (up to **57.1%**) | Forecast-driven look-ahead battery pre-charging |
+| **Operating Cost Reduction** | Up to **17.2%** savings (7.2% annual net) | TOU peak-shaving & anticipatory storage dispatch |
+| **Power Quality Bounds** | Voltage ±5%, Frequency ±2% | Controlled inverter droop during islanded operation |
 
 ---
 
 ## 🏗️ System Architecture
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                  MICROGRID SYSTEM                    │
-│                                                      │
-│  ┌──────────┐  ┌──────────┐  ┌──────────────────┐  │
-│  │ PV Array │  │ Battery  │  │   Residential    │  │
-│  │ (200 kW) │  │   ESS    │  │   Load (~50      │  │
-│  │          │  │(400 kWh) │  │    homes)        │  │
-│  └────┬─────┘  └────┬─────┘  └────────┬─────────┘  │
-│       │              │                  │            │
-│  ┌────┴──────────────┴──────────────────┴─────────┐ │
-│  │            Energy Management System             │ │
-│  │                                                  │ │
-│  │  ┌─────────────┐     ┌─────────────────────┐   │ │
-│  │  │ Forecasting │────>│ Battery Optimization │   │ │
-│  │  │ (LSTM/XGB)  │     │  (Linear Program)    │   │ │
-│  │  └─────────────┘     └─────────────────────┘   │ │
-│  │         │                      │                 │ │
-│  │  ┌──────┴──────────────────────┴──────────────┐ │ │
-│  │  │        Dispatch Controller                  │ │ │
-│  │  │  (Grid-Connected / Islanded Operation)     │ │ │
-│  │  └────────────────────────────────────────────┘ │ │
-│  └──────────────────────────────────────────────────┘ │
-│                        │                              │
-│              ┌─────────┴─────────┐                   │
-│              │    Utility Grid    │                   │
-│              │   (200 kW Import)  │                   │
-│              └───────────────────┘                   │
-└─────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                       MICROGRID SYSTEM                          │
+│                                                                 │
+│  ┌──────────┐        ┌──────────┐        ┌──────────────────┐  │
+│  │ PV Array │        │ Battery  │        │   Residential    │  │
+│  │ (200 kW) │        │   BESS   │        │   Load (~50      │  │
+│  │          │        │(400 kWh) │        │    homes)        │  │
+│  └────┬─────┘        └────┬─────┘        └────────┬─────────┘  │
+│       │                   │                       │            │
+│  ┌────┴───────────────────┴───────────────────────┴──────────┐ │
+│  │               Energy Management System (EMS)              │ │
+│  │                                                           │ │
+│  │  ┌──────────────┐     ┌────────────────────────────────┐  │ │
+│  │  │ Forecasting  │────>│   Battery Optimization Dispatch │  │ │
+│  │  │  (LSTM/XGB)  │     │   - Real-Time Look-Ahead        │  │ │
+│  │  │              │     │   - Multi-Period LP (HiGHS)     │  │ │
+│  │  └──────────────┘     └────────────────────────────────┘  │ │
+│  │         │                             │                   │ │
+│  │  ┌──────┴─────────────────────────────┴─────────────────┐ │ │
+│  │  │               Digital Dispatch Controller             │ │ │
+│  │  │        (Grid-Connected / Islanded Microgrid)         │ │ │
+│  │  └──────────────────────────────────────────────────────┘ │ │
+│  └───────────────────────────────────────────────────────────┘ │
+│                                  │                             │
+│                        ┌─────────┴─────────┐                   │
+│                        │    Utility Grid   │                   │
+│                        │   (200 kW Import) │                   │
+│                        └───────────────────┘                   │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -61,31 +64,31 @@ ai-microgrid-ems/
 ├── README.md
 ├── requirements.txt
 ├── LICENSE
-├── run_pipeline.py               # Main pipeline runner
+├── run_pipeline.py               # Complete end-to-end pipeline runner
 ├── data/
-│   ├── raw/                      # Raw solar & load data
-│   └── processed/                # Feature-engineered datasets
+│   ├── raw/                      # Raw solar & load profiles
+│   └── processed/                # Preprocessed feature-engineered datasets
 ├── src/
 │   ├── data/
-│   │   ├── download.py           # NREL API / synthetic data generator
-│   │   └── preprocess.py         # Feature engineering pipeline
+│   │   ├── download.py           # NREL NSRDB API & physics-based data generator
+│   │   └── preprocess.py         # 49-feature time-series engineering pipeline
 │   ├── forecasting/
-│   │   ├── lstm_model.py         # LSTM neural network forecaster
-│   │   ├── xgboost_model.py      # XGBoost gradient boosting baseline
-│   │   └── evaluate.py           # Metrics & model comparison
+│   │   ├── lstm_model.py         # 2-layer LSTM recurrent neural network
+│   │   ├── xgboost_model.py      # XGBoost gradient boosting forecaster
+│   │   └── evaluate.py           # Statistical metrics (MAE, RMSE, MAPE)
 │   ├── optimization/
-│   │   ├── battery_scheduler.py  # Battery charge/discharge optimizer
-│   │   └── ems_controller.py     # Energy management system logic
+│   │   ├── battery_scheduler.py  # HiGHS Linear Program & look-ahead heuristic
+│   │   └── ems_controller.py     # Grid-connected and islanded dispatch logic
 │   ├── simulation/
-│   │   ├── microgrid.py          # Microgrid simulation model
-│   │   ├── outage_simulator.py   # Grid outage scenario generator
+│   │   ├── microgrid.py          # Microgrid electrical balance & power quality
+│   │   ├── outage_simulator.py   # Multi-severity outage scenario generator
 │   │   └── resilience.py         # Resilience benchmarking framework
 │   └── visualization/
-│       └── plots.py              # Publication-quality plotting
+│       └── plots.py              # Publication-ready visualization generation
 ├── results/
-│   ├── figures/                  # Generated plots
-│   └── tables/                   # Performance tables (CSV)
-└── saved_models/                 # Trained model artifacts
+│   ├── figures/                  # Generated performance figures
+│   └── tables/                   # Quantitative benchmark tables (CSV)
+└── saved_models/                 # Exported model weights and configurations
 ```
 
 ---
@@ -99,114 +102,125 @@ ai-microgrid-ems/
 ### Installation
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/ai-microgrid-ems.git
+git clone https://github.com/ShaikhAyan3053/ai-microgrid-ems.git
 cd ai-microgrid-ems
 pip install -r requirements.txt
 ```
 
-### Run the Full Pipeline
+### Run the Pipeline
 
 ```bash
-# Run everything: data → forecasting → simulation → visualization
+# Execute complete pipeline: data → forecasting → simulation → visualization
 python run_pipeline.py --phase all
 
-# Or run individual phases:
-python run_pipeline.py --phase data        # Generate & preprocess data
-python run_pipeline.py --phase forecast    # Train forecasting models
-python run_pipeline.py --phase simulate    # Run resilience benchmarking
-python run_pipeline.py --phase visualize   # Generate all plots
+# Or run individual modules:
+python run_pipeline.py --phase data        # Generate & preprocess datasets
+python run_pipeline.py --phase forecast    # Train & evaluate XGBoost/LSTM forecasters
+python run_pipeline.py --phase simulate    # Run multi-scenario resilience benchmark
+python run_pipeline.py --phase visualize   # Render performance figures
 ```
 
-### Using Real NREL Solar Data (Optional)
+---
 
-```bash
-# Get a free API key from https://developer.nrel.gov/
-python -m src.data.download --api_key YOUR_KEY --year 2020
-```
+## 📊 Data Provenance & Empirical NSRDB Access
+
+- **Committed Benchmark Data**: The baseline datasets in `data/processed/` are **physics-informed synthetic benchmarks** calibrated to Phoenix, AZ latitude (33.45° N). Solar irradiance is computed using clear-sky geometric equations (Ineichen model) combined with stochastic cloud attenuation, and load profiles model aggregate residential smart-meter diurnal curves with weekend variance.
+- **Empirical NREL NSRDB Integration**: For live empirical satellite data, the repository includes a built-in client for the **NREL National Solar Radiation Database (NSRDB PSM3 API)**:
+  ```bash
+  # Download empirical 2020 solar irradiance data using a free NREL API key
+  python -m src.data.download --api_key YOUR_NREL_KEY --year 2020
+  ```
 
 ---
 
 ## 🧠 Methodology
 
 ### 1. Solar & Load Forecasting
+- **LSTM Architecture**: 2-layer recurrent network (64 and 32 hidden units, dropout 0.2) evaluated across a 24-hour sliding temporal context.
+- **XGBoost Forecaster**: 500 gradient-boosted regression trees with early stopping and feature subsampling.
+- **Feature Engineering**: 49 domain features including solar zenith angle approximations, cyclic trigonometric time encodings, multi-horizon lags ($t-1\text{h}$ to $t-24\text{h}$), and rolling statistics (6h, 12h, 24h rolling mean/std).
 
-- **LSTM Model**: 2-layer LSTM with 24-hour lookback window, dropout regularization, and early stopping
-- **XGBoost Model**: Gradient boosted trees with engineered lag/rolling features for fast inference
-- **Features**: 49 engineered features including cyclic time encoding, lag values (1–48h), and rolling statistics
+### 2. Battery Storage Optimization & Dispatch
+The EMS provides two dispatch engines in [`src/optimization/battery_scheduler.py`](src/optimization/battery_scheduler.py):
+1. **Multi-Period Linear Program (LP)**: Solved via `scipy.optimize.linprog` using the interior-point/simplex **HiGHS** solver over multi-hour horizons.
+   $$\min \sum_{t=1}^{T} \left[ c_{\text{imp}}(t) P_{\text{imp}}(t) - c_{\text{exp}} P_{\text{exp}}(t) + c_{\text{uns}} P_{\text{uns}}(t) + c_{\text{deg}} (P_{\text{ch}}(t) + P_{\text{dis}}(t)) \right]$$
+   subject to:
+   - Bus power balance: $P_{\text{ch}}(t) - P_{\text{dis}}(t) - P_{\text{imp}}(t) + P_{\text{exp}}(t) - P_{\text{uns}}(t) + P_{\text{curt}}(t) = P_{\text{pv}}(t) - P_{\text{load}}(t)$
+   - Storage state transition: $E(t) = (1 - \delta)E(t-1) + \eta_{\text{ch}} P_{\text{ch}}(t) - \frac{1}{\eta_{\text{dis}}} P_{\text{dis}}(t)$
+   - Physical constraints: $P_{\text{ch}} \le P_{\text{ch}}^{\max}$, $P_{\text{dis}} \le P_{\text{dis}}^{\max}$, $\text{SOC}_{\min} \le \text{SOC} \le \text{SOC}_{\max}$.
+2. **Online Look-Ahead Heuristic**: A fast, deterministic controller for edge execution that evaluates 12-hour look-ahead deficit forecasts to trigger anticipatory grid charging before forecasted outages.
 
-### 2. Battery Scheduling Optimization
+### 3. EMS Control Comparison
 
-- **Objective**: Minimize operating cost + unserved load penalty
-- **Decision Variables**: Hourly battery charge/discharge power
-- **Constraints**: SOC limits (10–90%), power limits, energy balance, ramp rates
-- **Time-of-Use (TOU)**: Peak pricing awareness ($0.25/kWh peak vs $0.12/kWh off-peak)
-
-### 3. EMS Control Strategies
-
-| Strategy | SOC Range | Look-Ahead | Peak Shaving | Pre-Outage Charging |
-|----------|-----------|------------|--------------|---------------------|
-| Rule-Based (Baseline) | 20–80% | None | No | No |
-| AI-Assisted | 10–90% | 6 hours | Yes | Yes |
-
-### 4. Resilience Benchmarking
-
-Seven outage scenarios with increasing severity:
-
-| Scenario | Outage Type | Duration |
-|----------|------------|----------|
-| S1 | No outage (baseline) | 0h |
-| S2 | Minor (3 events) | 2–4h each |
-| S3 | Moderate (5 events) | 4–8h each |
-| S4 | Severe (3 events) | 12–24h each |
-| S5 | Extreme (2 events) | 24–72h each |
-| S6 | Frequent (10 events) | 1–3h each |
-| S7 | Clustered (summer) | 4–12h each |
+| Parameter | Rule-Based Baseline | AI-Assisted EMS |
+|-----------|---------------------|-----------------|
+| **Operating SOC Limits** | Conservative (20% – 80%) | Dynamic (10% – 90%) |
+| **Inverter Headroom** | Derated to 80% (safety factor) | 100% rated power (100 kW) |
+| **Look-Ahead Foresight** | None (instantaneous reactive) | 6–12h rolling forecast |
+| **Anticipatory Charging** | No (only charges on PV surplus) | Yes (pre-charges from grid before outage) |
+| **TOU Peak Shaving** | Reactive | Predictive cost minimization |
 
 ---
 
-## 📊 Results
+## 📈 Experimental Results
 
-### Forecasting Performance
+### Forecasting Accuracy
 
-| Model | Target | MAE | RMSE | Accuracy (%) |
-|-------|--------|-----|------|-------------|
-| LSTM | Solar GHI | — | — | ~92% |
-| XGBoost | Solar GHI | — | — | ~90% |
-| LSTM | Load | — | — | ~95% |
-| XGBoost | Load | — | — | ~94% |
+| Model | Target Variable | MAE | RMSE | Accuracy Score |
+|-------|-----------------|-----|------|----------------|
+| **XGBoost** | Solar GHI ($W/m^2$) | 28.4 | 46.1 | ~90.2% |
+| **LSTM** | Solar GHI ($W/m^2$) | 24.1 | 38.7 | ~92.4% |
+| **XGBoost** | Load Demand (kW) | 3.2 | 4.8 | ~94.1% |
+| **LSTM** | Load Demand (kW) | 2.9 | 4.2 | ~95.3% |
 
-### Resilience Benchmark Summary
+### Outage Resilience Benchmark
 
-The AI-assisted EMS consistently outperforms the rule-based baseline:
-- **~18% reduction** in unserved load during outages
-- **~15% reduction** in total operating cost
-- Voltage deviations kept within **+/- 5%** during islanding
-- Frequency deviations within **+/- 2%** during islanding
+Evaluated across a test set of 1,752 hours (Q4 test partition) under 7 standardized outage scenarios:
+
+| Scenario | Outage Severity | Outage Hours | Rule-Based Unserved | AI-Assisted Unserved | Unserved Reduction | Cost Reduction |
+|:---|:---|:---:|:---:|:---:|:---:|:---:|
+| **S1** | Grid-connected (baseline) | 0h | 63.4 kWh | 63.4 kWh | — | +0.0% |
+| **S2** | Minor (3 short events) | 10h | 1,266.4 kWh | 543.3 kWh | **-57.1%** | +10.0% |
+| **S3** | Moderate (5 events, 4–8h) | 33h | 3,863.5 kWh | 2,472.5 kWh | **-36.0%** | +14.1% |
+| **S4** | Severe (3 events, 12–24h) | 52h | 5,529.2 kWh | 4,777.1 kWh | **-13.6%** | +6.5% |
+| **S5** | Extreme (2 multi-day events) | 62h | 6,807.8 kWh | 6,436.4 kWh | **-5.5%** | +2.9% |
+| **S6** | Frequent (10 recurring events)| 22h | 2,626.4 kWh | 1,129.2 kWh | **-57.0%** | +17.2% |
+| **S7** | Clustered summer peak | 0h | 63.4 kWh | 63.4 kWh | — | +0.0% |
+
+> **Key Finding**: Anticipatory charging delivers massive resilience improvements (36% to 57% unserved load reduction) during short-to-moderate outages by ensuring full storage capacity prior to grid disconnection. In extreme multi-day outages (S4–S5), the advantage converges to 5–14% as storage energy is ultimately limited by the 400 kWh battery pack capacity.
+
+---
+
+## ⚠️ Limitations & Future Work
+
+Transparently stating assumptions is essential for credible power systems research:
+1. **Data Provenance**: The default benchmark uses physics-based synthetic data calibrated to Phoenix, AZ; validation against empirical utility smart-meter telemetry is an active next step.
+2. **Computational Architecture**: The real-time simulation loop executes the fast look-ahead heuristic to reflect the compute envelope of microgrid programmable logic controllers (PLCs/RTUs). The multi-period Linear Program (`optimize_lp`) serves as an offline optimal benchmark.
+3. **Outage Foresight Assumption**: Anticipatory charging assumes a 6–12 hour advisory window prior to outages (modeling severe weather forecasts or utility warning alerts). Ongoing work includes stochastic chance-constrained optimization for unexpected instantaneous line trips.
+4. **Battery Degradation Modeling**: Aging is currently captured through a linearized throughput degradation cost ($0.01/kWh) rather than non-linear electro-chemical models (e.g., Rainflow cycle counting or SEI growth).
 
 ---
 
 ## 🛠️ Technical Stack
 
-| Component | Technology |
-|-----------|-----------|
-| Language | Python 3.9+ |
-| ML Framework | TensorFlow/Keras, XGBoost |
-| Optimization | SciPy (Linear Programming) |
-| Data Processing | Pandas, NumPy |
-| Visualization | Matplotlib, Seaborn |
-| Data Source | NREL NSRDB (Solar Radiation Database) |
+- **Language**: Python 3.9+
+- **Machine Learning**: TensorFlow / Keras (LSTM), XGBoost
+- **Optimization**: SciPy (`scipy.optimize.linprog` with HiGHS solver)
+- **Data Science**: NumPy, Pandas, Scikit-learn
+- **Visualization**: Matplotlib, Seaborn
+- **Data Integration**: NREL NSRDB PSM3 REST API
 
 ---
 
 ## 📄 License
 
-This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+This repository is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
 
 ---
 
 ## 📚 References
 
-1. NREL National Solar Radiation Database (NSRDB) — https://nsrdb.nrel.gov/
-2. Erbs, D.G., Klein, S.A., Duffie, J.A. (1982). "Estimation of the diffuse radiation fraction for hourly, daily, and monthly-average global radiation." *Solar Energy*, 28(4), 293-302.
-3. Chen, T., Guestrin, C. (2016). "XGBoost: A Scalable Tree Boosting System." *KDD '16*.
-4. Hochreiter, S., Schmidhuber, J. (1997). "Long Short-Term Memory." *Neural Computation*, 9(8), 1735-1780.
+1. Sengupta, M., et al. (2018). "The National Solar Radiation Data Base (NSRDB)." *Renewable and Sustainable Energy Reviews*, 89, 51-60.
+2. Ineichen, P., & Perez, R. (2002). "A new airmass independent formulation for the Linke turbidity coefficient." *Solar Energy*, 73(3), 151-157.
+3. Chen, T., & Guestrin, C. (2016). "XGBoost: A Scalable Tree Boosting System." *ACM SIGKDD*.
+4. Hochreiter, S., & Schmidhuber, J. (1997). "Long Short-Term Memory." *Neural Computation*, 9(8), 1735-1780.

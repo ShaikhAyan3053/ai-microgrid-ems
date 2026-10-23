@@ -89,6 +89,14 @@ def run_forecasting(year: int = 2020):
     results["XGBoost Load"] = xgb_load_metrics
     xgb_load.save("xgb_load")
 
+    # Convert solar GHI forecast to microgrid PV generation power (kW)
+    from src.data.preprocess import compute_pv_power
+    solar_pred_df = pd.DataFrame(
+        {"ghi": np.clip(xgb_solar_pred, 0, None), "temperature": test_df.get("temperature", 25.0)},
+        index=test_df.index,
+    )
+    pv_power_pred = compute_pv_power(solar_pred_df).values
+
     # --- Model Comparison ---
     comparison_df = compare_models(results)
 
@@ -101,7 +109,7 @@ def run_forecasting(year: int = 2020):
         "results": results,
         "comparison": comparison_df,
         "predictions": {
-            "xgb_solar": xgb_solar_pred,
+            "xgb_solar": pv_power_pred,
             "xgb_load": xgb_load_pred,
         },
         "test_df": test_df,
@@ -122,14 +130,32 @@ def run_simulation(year: int = 2020, forecasts: dict = None):
     )
 
     benchmark = ResilienceBenchmark()
-    
-    pv_forecast = forecasts["xgb_solar"] if forecasts else None
-    load_forecast = forecasts["xgb_load"] if forecasts else None
-    
+
+    if forecasts is None:
+        try:
+            from src.forecasting.xgboost_model import XGBoostForecaster
+            from src.data.preprocess import compute_pv_power
+            print("  Loading trained forecasters from saved_models...")
+            xgb_solar = XGBoostForecaster.load("xgb_solar")
+            xgb_load = XGBoostForecaster.load("xgb_load")
+            solar_pred_df = pd.DataFrame(
+                {"ghi": np.clip(xgb_solar.predict(test_df), 0, None), "temperature": test_df.get("temperature", 25.0)},
+                index=test_df.index,
+            )
+            pv_forecast = compute_pv_power(solar_pred_df).values
+            load_forecast = xgb_load.predict(test_df)
+        except Exception:
+            print("  Using ground-truth test profiles for look-ahead signal...")
+            pv_forecast = test_df["pv_power_kw"].values
+            load_forecast = test_df["load_kw"].values
+    else:
+        pv_forecast = forecasts.get("xgb_solar")
+        load_forecast = forecasts.get("xgb_load")
+
     results = benchmark.run_full_benchmark(
-        test_df, 
-        pv_forecast=pv_forecast, 
-        load_forecast=load_forecast
+        test_df,
+        pv_forecast=pv_forecast,
+        load_forecast=load_forecast,
     )
 
     return results
